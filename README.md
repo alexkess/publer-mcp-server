@@ -146,41 +146,41 @@ Add to `.cursor/mcp.json`:
 
 | Tool | Description |
 |---|---|
-| `get_me` | Get current authenticated user profile |
-| `list_workspaces` | List all workspaces |
-| `list_accounts` | List all connected social accounts |
+| `publer_get_me` | Get current authenticated user profile |
+| `publer_list_workspaces` | List all workspaces |
+| `publer_list_accounts` | List all connected social accounts |
 
 ### Posts
 
 | Tool | Description |
 |---|---|
-| `list_posts` | List and filter posts by state, date, type, account, or search |
-| `create_post` | Create and schedule a post (text, photo, video, carousel, etc.) |
-| `publish_post_now` | Publish a post immediately |
-| `update_post` | Update an existing post |
-| `delete_post` | Delete a post |
+| `publer_list_posts` | List and filter posts by state, date, type, account, or search |
+| `publer_create_post` | Create and schedule a post (text, photo, video, carousel, etc.) |
+| `publer_publish_post_now` | Publish a post immediately |
+| `publer_update_post` | Update an existing post |
+| `publer_delete_post` | Delete a post |
 
 ### Media
 
 | Tool | Description |
 |---|---|
-| `upload_media_from_url` | Import media from a URL (Dropbox, cloud storage, etc.) |
-| `list_media` | Browse and search the media library |
+| `publer_upload_media_from_url` | Import media from a URL (Dropbox, cloud storage, etc.) |
+| `publer_list_media` | Browse and search the media library |
 
 ### Jobs
 
 | Tool | Description |
 |---|---|
-| `get_job_status` | Poll async job status (post creation, media upload) |
+| `publer_get_job_status` | Poll async job status (post creation, media upload) |
 
 ### Analytics
 
 | Tool | Description |
 |---|---|
-| `get_analytics` | Get analytics charts (followers, reach, engagement) |
-| `get_post_insights` | Get per-post performance metrics |
-| `get_hashtag_analysis` | Analyse hashtag performance |
-| `get_best_times` | Get best times to post heatmap |
+| `publer_get_analytics` | Get analytics charts (followers, reach, engagement) |
+| `publer_get_post_insights` | Get per-post performance metrics |
+| `publer_get_hashtag_analysis` | Analyse hashtag performance |
+| `publer_get_best_times` | Get best times to post heatmap |
 
 ## Example Workflows
 
@@ -193,9 +193,9 @@ with the caption 'Cronulla from above.'"
 ```
 
 The AI assistant will:
-1. Call `upload_media_from_url` with the Dropbox link
-2. Poll `get_job_status` until the upload completes
-3. Call `create_post` with the media ID, caption, account ID, and scheduled time
+1. Call `publer_upload_media_from_url` with the Dropbox link
+2. Poll `publer_get_job_status` until the upload completes
+3. Call `publer_create_post` with the media ID, caption, account ID, and scheduled time
 
 ### Check post performance
 
@@ -204,8 +204,8 @@ The AI assistant will:
 ```
 
 The AI assistant will:
-1. Call `list_accounts` to find the Instagram account ID
-2. Call `get_post_insights` with the date range
+1. Call `publer_list_accounts` to find the Instagram account ID
+2. Call `publer_get_post_insights` with the date range
 3. Present the results
 
 ## Development
