@@ -1,0 +1,31 @@
+{
+  "name": "publer-mcp-server",
+  "version": "1.0.0",
+  "description": "An open-source Model Context Protocol (MCP) server for the Publer social media management API. Schedule posts, upload media, pull analytics, and manage accounts across 15+ social networks from your AI assistant.",
+  "main": "dist/index.js",
+  "bin": {
+    "publer-mcp-server": "dist/index.js"
+  },
+  "type": "commonjs",
+  "scripts": {
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "dev": "tsc --watch",
+    "prepublishOnly": "npm run build"
+  },
+  "keywords": ["mcp","model-context-protocol","publer","social-media","scheduling","api","ai","claude","llm","automation"],
+  "author": "Kess Media <alex@kess.media> (https://kess.media)",
+  "license": "MIT",
+  "repository": {"type": "git","url": "https://github.com/alexkess/publer-mcp-server"},
+  "homepage": "https://github.com/alexkess/publer-mcp-server#readme",
+  "engines": {"node": ">=18.0.0"},
+  "files": ["dist","README.md","LICENSE"],
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.12.1",
+    "zod": "^3.24.4"
+  },
+  "devDependencies": {
+    "@types/node": "^22.15.17",
+    "typescript": "^5.8.3"
+  }
+}

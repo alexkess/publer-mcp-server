@@ -1,0 +1,7 @@
+node_modules/
+dist/
+.env
+*.tgz
+worker/node_modules/
+worker/dist/
+.wrangler/
