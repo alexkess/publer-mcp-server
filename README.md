@@ -136,9 +136,17 @@ Add to `.cursor/mcp.json`:
 
 ### Finding Your Workspace ID
 
-1. Log in to [Publer](https://app.publer.com)
-2. Go to Settings → Workspace
-3. Copy the workspace ID from the URL or settings page
+**Option 1: From the API**
+
+```bash
+curl -H "Authorization: Bearer-API YOUR_API_KEY" https://app.publer.com/api/v1/me
+```
+
+Your workspace IDs are in the `workspaces` array in the response.
+
+**Option 2: From the Publer URL**
+
+Log in to Publer, open your browser's developer tools (F12), go to the Network tab, and look for any API request — the `Publer-Workspace-Id` header shows your workspace ID.
 
 ## Available Tools
 
