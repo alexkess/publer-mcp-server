@@ -13,13 +13,33 @@
     "dev": "tsc --watch",
     "prepublishOnly": "npm run build"
   },
-  "keywords": ["mcp","model-context-protocol","publer","social-media","scheduling","api","ai","claude","llm","automation"],
+  "keywords": [
+    "mcp",
+    "model-context-protocol",
+    "publer",
+    "social-media",
+    "scheduling",
+    "api",
+    "ai",
+    "claude",
+    "llm",
+    "automation"
+  ],
   "author": "Kess Media <alex@kess.media> (https://kess.media)",
   "license": "MIT",
-  "repository": {"type": "git","url": "https://github.com/alexkess/publer-mcp-server"},
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/alexkess/publer-mcp-server"
+  },
   "homepage": "https://github.com/alexkess/publer-mcp-server#readme",
-  "engines": {"node": ">=18.0.0"},
-  "files": ["dist","README.md","LICENSE"],
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.12.1",
     "zod": "^3.24.4"
