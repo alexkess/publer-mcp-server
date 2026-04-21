@@ -162,19 +162,27 @@ export class PublerClient {
   }
 
   // ── Analytics ──
+  // FIX: Publer API requires /chart_data with chart_ids[] query param, not /charts.
+  // We auto-fetch available chart definitions from /analytics/charts then request
+  // chart_data for all of them so the tool gives a complete report in one call.
   async getCharts(accountId: string, params: Record<string, string>): Promise<unknown> {
-    const qs = new URLSearchParams(params).toString();
-    return this.request("GET", `/analytics/${accountId}/charts${qs ? `?${qs}` : ""}`);
+    const chartList = (await this.request("GET", "/analytics/charts")) as Array<{ id: string }>;
+    const chartIds = Array.isArray(chartList) ? chartList.map((c) => c.id) : [];
+    const qp = new URLSearchParams(params);
+    for (const id of chartIds) qp.append("chart_ids[]", id);
+    return this.request("GET", `/analytics/${accountId}/chart_data?${qp.toString()}`);
   }
 
+  // FIX: path is /post_insights, not /posts
   async getPostInsights(accountId: string, params: Record<string, string>): Promise<unknown> {
     const qs = new URLSearchParams(params).toString();
-    return this.request("GET", `/analytics/${accountId}/posts${qs ? `?${qs}` : ""}`);
+    return this.request("GET", `/analytics/${accountId}/post_insights${qs ? `?${qs}` : ""}`);
   }
 
+  // FIX: path is /hashtag_insights, not /hashtags
   async getHashtagAnalysis(accountId: string, params: Record<string, string>): Promise<unknown> {
     const qs = new URLSearchParams(params).toString();
-    return this.request("GET", `/analytics/${accountId}/hashtags${qs ? `?${qs}` : ""}`);
+    return this.request("GET", `/analytics/${accountId}/hashtag_insights${qs ? `?${qs}` : ""}`);
   }
 
   async getBestTimes(accountId: string, params: Record<string, string>): Promise<unknown> {
