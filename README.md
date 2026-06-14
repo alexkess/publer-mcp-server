@@ -8,11 +8,14 @@ Created by [Kess Media](https://kess.media)
 
 ## Features
 
-- **14 tools** covering the full Publer API
+- **19 tools** covering the full Publer API
 - Create, schedule, publish, update, and delete posts
-- Upload media via URL (perfect for Dropbox/cloud storage integration)
+- Bulk-create/schedule up to 500 posts in a single call
+- Reschedule posts and turn existing drafts into scheduled/published posts
+- Pinterest board support (pin to a named or default board)
+- Upload media from a URL **or a local file**
 - Browse and search media library
-- Analytics: charts, post insights, hashtag analysis, best times to post
+- Analytics: charts, post insights, hashtag analysis, best times to post (defaults to the last 90 days)
 - Multi-account posting across Facebook, Instagram, X, LinkedIn, TikTok, YouTube, Bluesky, and more
 - Async job polling for post creation and media uploads
 
@@ -163,15 +166,19 @@ Log in to Publer, open your browser's developer tools (F12), go to the Network t
 | Tool | Description |
 |---|---|
 | `publer_list_posts` | List and filter posts by state, date, type, account, or search |
-| `publer_create_post` | Create and schedule a post (text, photo, video, carousel, etc.) |
+| `publer_create_post` | Create and schedule a post (text, photo, video, carousel, Pinterest board, etc.) |
+| `publer_create_posts` | Create/schedule many posts in one call (native bulk, up to 500) |
 | `publer_publish_post_now` | Publish a post immediately |
-| `publer_update_post` | Update an existing post |
+| `publer_reschedule_post` | Move an existing post to a new scheduled time |
+| `publer_publish_draft` | Turn an existing draft into a scheduled or published post |
+| `publer_update_post` | Update an existing post's text/title |
 | `publer_delete_post` | Delete a post |
 
 ### Media
 
 | Tool | Description |
 |---|---|
+| `publer_upload_media` | Upload a local image/video file; returns ready-to-use media IDs |
 | `publer_upload_media_from_url` | Import media from a URL (Dropbox, cloud storage, etc.) |
 | `publer_list_media` | Browse and search the media library |
 
