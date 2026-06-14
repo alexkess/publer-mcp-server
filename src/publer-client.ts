@@ -83,17 +83,38 @@ export class PublerClient {
     return this.request("POST", "/posts/schedule/publish", body);
   }
 
-  async updatePost(postId: string, body: unknown): Promise<unknown> {
-    return this.request("PUT", `/posts/${postId}`, body);
+  async updatePost(postId: string, body: Record<string, unknown>): Promise<unknown> {
+    // Publer expects update fields wrapped under a "post" key.
+    const payload = "post" in body ? body : { post: body };
+    return this.request("PUT", `/posts/${postId}`, payload);
   }
 
-  async deletePost(postId: string): Promise<unknown> {
-    return this.request("DELETE", `/posts/${postId}`);
+  async deletePost(postId: string | string[]): Promise<unknown> {
+    // Publer deletes via DELETE /posts?post_ids[]=... (bulk, query param) and returns
+    // { deleted_ids: [...] }. The old /posts/{id} route returned a 404.
+    const ids = Array.isArray(postId) ? postId : [postId];
+    const qp = new URLSearchParams();
+    for (const id of ids) qp.append("post_ids[]", id);
+    return this.request("DELETE", `/posts?${qp.toString()}`);
+  }
+
+  async getPost(postId: string): Promise<unknown> {
+    return this.request("GET", `/posts/${postId}`);
   }
 
   // ── Media ──
-  async listMedia(params: Record<string, string>): Promise<unknown> {
-    const qs = new URLSearchParams(params).toString();
+  async listMedia(params: Record<string, string | string[]>): Promise<unknown> {
+    // Build repeated array params (types[]=photo&types[]=video&...). Publer ignores
+    // comma-joined values, which made list_media always return an empty library.
+    const qp = new URLSearchParams();
+    for (const [key, value] of Object.entries(params)) {
+      if (Array.isArray(value)) {
+        for (const item of value) qp.append(key, item);
+      } else {
+        qp.append(key, value);
+      }
+    }
+    const qs = qp.toString();
     return this.request("GET", `/media${qs ? `?${qs}` : ""}`);
   }
 
@@ -161,24 +182,75 @@ export class PublerClient {
     return this.request("GET", `/job_status/${jobId}`);
   }
 
+  /**
+   * Poll an async Publer job until it reaches a terminal state.
+   * Publer's job_status returns { status: "working" | "complete" | "failed", payload?: ... }.
+   * Defaults mirror Publer's own clients (3s interval, up to ~2 minutes).
+   */
+  async pollJob(
+    jobId: string,
+    opts: { intervalMs?: number; maxAttempts?: number } = {}
+  ): Promise<Record<string, unknown>> {
+    const intervalMs = opts.intervalMs ?? 3000;
+    const maxAttempts = opts.maxAttempts ?? 40;
+    let last: Record<string, unknown> = {};
+    for (let i = 0; i < maxAttempts; i++) {
+      last = (await this.getJobStatus(jobId)) as Record<string, unknown>;
+      const status = String(last?.status ?? "").toLowerCase();
+      if (["complete", "completed", "failed", "failure", "error"].includes(status)) {
+        return last;
+      }
+      await new Promise((r) => setTimeout(r, intervalMs));
+    }
+    return last;
+  }
+
   // ── Analytics ──
+  // Publer's analytics endpoints need a from/to range in YYYY-MM-DD. Without it,
+  // post_insights 500s and best_times returns []. Default to the last 90 days and
+  // normalize any supplied dates to YYYY-MM-DD.
+  private analyticsDates(params: Record<string, string>): Record<string, string> {
+    const DAY = 86400000;
+    const fmt = (d: Date) => d.toISOString().slice(0, 10);
+    const parse = (s?: string) => {
+      if (!s) return null;
+      const d = new Date(s);
+      return isNaN(d.getTime()) ? null : d;
+    };
+    const out: Record<string, string> = { ...params };
+    const toD = parse(out.to) ?? new Date();
+    const fromD = parse(out.from) ?? new Date(toD.getTime() - 90 * DAY);
+    out.from = fmt(fromD);
+    out.to = fmt(toD);
+    return out;
+  }
+
+  // FIX (upstream PR #1): the charts endpoint is /analytics/{id}/chart_data with a
+  // chart_ids[] query param, not /charts. Auto-fetch the available chart definitions
+  // from /analytics/charts, then request chart_data for all of them in one call.
   async getCharts(accountId: string, params: Record<string, string>): Promise<unknown> {
-    const qs = new URLSearchParams(params).toString();
-    return this.request("GET", `/analytics/${accountId}/charts${qs ? `?${qs}` : ""}`);
+    const chartList = (await this.request("GET", "/analytics/charts")) as Array<{ id: string }>;
+    const chartIds = Array.isArray(chartList) ? chartList.map((c) => c.id) : [];
+    const qp = new URLSearchParams(this.analyticsDates(params));
+    for (const id of chartIds) qp.append("chart_ids[]", id);
+    return this.request("GET", `/analytics/${accountId}/chart_data?${qp.toString()}`);
   }
 
+  // FIX (upstream PR #1): path is /post_insights, not /posts. Requires a from/to range.
   async getPostInsights(accountId: string, params: Record<string, string>): Promise<unknown> {
-    const qs = new URLSearchParams(params).toString();
-    return this.request("GET", `/analytics/${accountId}/posts${qs ? `?${qs}` : ""}`);
+    const qs = new URLSearchParams(this.analyticsDates(params)).toString();
+    return this.request("GET", `/analytics/${accountId}/post_insights?${qs}`);
   }
 
+  // FIX (upstream PR #1): path is /hashtag_insights, not /hashtags.
   async getHashtagAnalysis(accountId: string, params: Record<string, string>): Promise<unknown> {
-    const qs = new URLSearchParams(params).toString();
-    return this.request("GET", `/analytics/${accountId}/hashtags${qs ? `?${qs}` : ""}`);
+    const qs = new URLSearchParams(this.analyticsDates(params)).toString();
+    return this.request("GET", `/analytics/${accountId}/hashtag_insights?${qs}`);
   }
 
+  // best_times returns [] without a date range, so default one too.
   async getBestTimes(accountId: string, params: Record<string, string>): Promise<unknown> {
-    const qs = new URLSearchParams(params).toString();
-    return this.request("GET", `/analytics/${accountId}/best_times${qs ? `?${qs}` : ""}`);
+    const qs = new URLSearchParams(this.analyticsDates(params)).toString();
+    return this.request("GET", `/analytics/${accountId}/best_times?${qs}`);
   }
 }
