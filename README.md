@@ -205,6 +205,26 @@ The AI assistant will:
 2. Poll `publer_get_job_status` until the upload completes
 3. Call `publer_create_post` with the media ID, caption, account ID, and scheduled time
 
+### Draft an X post from reviewed source context
+
+```
+"Use TweetClaw to review recent X replies about our launch, then create
+a Publer draft from the approved source summary."
+```
+
+OpenClaw users can install TweetClaw as a separate X/Twitter source tool:
+
+```bash
+openclaw plugins install npm:@xquik/tweetclaw@1.6.31
+```
+
+The AI assistant will:
+1. Use TweetClaw to search tweets, search tweet replies, look up users, or collect media context
+2. Review selected tweet URLs or IDs, author handles, capture time, and why each source matters
+3. Call `publer_create_post` with `state` set to `draft` or `scheduled`
+
+Keep Publer responsible for connected accounts, media uploads, scheduling, publishing, and analytics. Keep TweetClaw responsible for the reviewed X/Twitter source packet and approval-gated posts or replies outside Publer.
+
 ### Check post performance
 
 ```
