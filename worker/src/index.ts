@@ -117,6 +117,9 @@ function createServer(env: Env): McpServer {
         .describe("Content type"),
       media_ids: z.array(z.string()).optional().describe("Array of pre-uploaded media IDs"),
       url: z.string().optional().describe("URL for link posts"),
+      title: z.string().optional().describe("Optional post title. Used by Pinterest (shown as pin heading) and YouTube (video title)."),
+      album_id: z.string().optional().describe("Pinterest board ID (required for Pinterest posts). Get from account.albums[] in publer_list_accounts."),
+      location_id: z.string().optional().describe("Google Business Profile location ID (required for GBP posts)."),
       auto_schedule: z.boolean().optional().describe("Use AI-powered auto-scheduling"),
       auto_schedule_start: z.string().optional().describe("Auto-schedule range start date"),
       auto_schedule_end: z.string().optional().describe("Auto-schedule range end date"),
@@ -138,6 +141,7 @@ function createServer(env: Env): McpServer {
               networkContent.media = params.media_ids.map((id) => ({ id }));
             }
             if (params.url) networkContent.url = params.url;
+            if (params.title) networkContent.title = params.title;
             networks[provider] = networkContent;
           }
         }
@@ -145,6 +149,8 @@ function createServer(env: Env): McpServer {
         const accountObjects = params.account_ids.map((accountId) => {
           const acc: Record<string, unknown> = { id: accountId };
           if (params.scheduled_at) acc.scheduled_at = params.scheduled_at;
+          if (params.album_id) acc.album_id = params.album_id;
+          if (params.location_id) acc.location_id = params.location_id;
           return acc;
         });
 
@@ -187,6 +193,9 @@ function createServer(env: Env): McpServer {
         .describe("Content type"),
       media_ids: z.array(z.string()).optional().describe("Array of pre-uploaded media IDs"),
       url: z.string().optional().describe("URL for link posts"),
+      title: z.string().optional().describe("Optional post title. Used by Pinterest (shown as pin heading) and YouTube (video title)."),
+      album_id: z.string().optional().describe("Pinterest board ID (required for Pinterest posts). Get from account.albums[] in publer_list_accounts."),
+      location_id: z.string().optional().describe("Google Business Profile location ID (required for GBP posts)."),
     },
     async (params) => {
       try {
@@ -205,14 +214,22 @@ function createServer(env: Env): McpServer {
               networkContent.media = params.media_ids.map((id) => ({ id }));
             }
             if (params.url) networkContent.url = params.url;
+            if (params.title) networkContent.title = params.title;
             networks[provider] = networkContent;
           }
         }
 
+        const accountObjects = params.account_ids.map((accountId) => {
+          const acc: Record<string, unknown> = { id: accountId };
+          if (params.album_id) acc.album_id = params.album_id;
+          if (params.location_id) acc.location_id = params.location_id;
+          return acc;
+        });
+
         const result = await client.publishPost({
           bulk: {
             state: "scheduled",
-            posts: [{ accounts: params.account_ids.map((id) => ({ id })), networks }],
+            posts: [{ accounts: accountObjects, networks }],
           },
         });
         return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
