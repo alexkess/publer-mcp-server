@@ -42,7 +42,8 @@ export class PublerClient {
   }
 
   async getMe(): Promise<unknown> {
-    return this.request("GET", "/me");
+    // Publer's router has no /me — the user endpoint lives at /users/me.
+    return this.request("GET", "/users/me");
   }
 
   async listWorkspaces(): Promise<unknown> {
