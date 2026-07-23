@@ -1,6 +1,6 @@
 {
   "name": "publer-mcp-server",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "description": "An open-source Model Context Protocol (MCP) server for the Publer social media management API. Schedule posts, upload media, pull analytics, and manage accounts across 15+ social networks from your AI assistant.",
   "main": "dist/index.js",
   "bin": {

@@ -163,31 +163,51 @@ export class PublerClient {
   }
 
   // ── Analytics ──
+  // Publer's analytics endpoints need a from/to range in YYYY-MM-DD. Without it,
+  // post_insights 500s and best_times returns []. Default to the last 90 days and
+  // normalize any supplied dates to YYYY-MM-DD.
+  private analyticsDates(params: Record<string, string>): Record<string, string> {
+    const DAY = 86400000;
+    const fmt = (d: Date) => d.toISOString().slice(0, 10);
+    const parse = (s?: string) => {
+      if (!s) return null;
+      const d = new Date(s);
+      return isNaN(d.getTime()) ? null : d;
+    };
+    const out: Record<string, string> = { ...params };
+    const toD = parse(out.to) ?? new Date();
+    const fromD = parse(out.from) ?? new Date(toD.getTime() - 90 * DAY);
+    out.from = fmt(fromD);
+    out.to = fmt(toD);
+    return out;
+  }
+
   // FIX: Publer API requires /chart_data with chart_ids[] query param, not /charts.
   // We auto-fetch available chart definitions from /analytics/charts then request
   // chart_data for all of them so the tool gives a complete report in one call.
   async getCharts(accountId: string, params: Record<string, string>): Promise<unknown> {
     const chartList = (await this.request("GET", "/analytics/charts")) as Array<{ id: string }>;
     const chartIds = Array.isArray(chartList) ? chartList.map((c) => c.id) : [];
-    const qp = new URLSearchParams(params);
+    const qp = new URLSearchParams(this.analyticsDates(params));
     for (const id of chartIds) qp.append("chart_ids[]", id);
     return this.request("GET", `/analytics/${accountId}/chart_data?${qp.toString()}`);
   }
 
-  // FIX: path is /post_insights, not /posts
+  // FIX: path is /post_insights, not /posts. Requires a from/to range.
   async getPostInsights(accountId: string, params: Record<string, string>): Promise<unknown> {
-    const qs = new URLSearchParams(params).toString();
-    return this.request("GET", `/analytics/${accountId}/post_insights${qs ? `?${qs}` : ""}`);
+    const qs = new URLSearchParams(this.analyticsDates(params)).toString();
+    return this.request("GET", `/analytics/${accountId}/post_insights?${qs}`);
   }
 
   // FIX: path is /hashtag_insights, not /hashtags
   async getHashtagAnalysis(accountId: string, params: Record<string, string>): Promise<unknown> {
-    const qs = new URLSearchParams(params).toString();
-    return this.request("GET", `/analytics/${accountId}/hashtag_insights${qs ? `?${qs}` : ""}`);
+    const qs = new URLSearchParams(this.analyticsDates(params)).toString();
+    return this.request("GET", `/analytics/${accountId}/hashtag_insights?${qs}`);
   }
 
+  // best_times returns [] without a date range, so default one too.
   async getBestTimes(accountId: string, params: Record<string, string>): Promise<unknown> {
-    const qs = new URLSearchParams(params).toString();
-    return this.request("GET", `/analytics/${accountId}/best_times${qs ? `?${qs}` : ""}`);
+    const qs = new URLSearchParams(this.analyticsDates(params)).toString();
+    return this.request("GET", `/analytics/${accountId}/best_times?${qs}`);
   }
 }
