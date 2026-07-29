@@ -119,7 +119,7 @@ server.tool(
 // ── Tool: Create Post (Schedule) ──
 server.tool(
   "publer_create_post",
-  "Create and schedule a social media post. Supports text, photo, video, link, carousel, reel, story, and more. Posts are created asynchronously — returns a job_id to poll for status. Media must be pre-uploaded using upload_media or upload_media_from_url first.",
+  "Create and schedule a social media post. This is the supported way to apply labels to new scheduled posts or drafts: pass labels here when creating the post. Existing draft labels cannot be edited reliably through Publer's documented API. Posts are created asynchronously — returns a job_id to poll for status.",
   {
     account_ids: z.array(z.string()).describe("Array of account IDs to post to"),
     text: z.string().describe("Post caption/text content"),
@@ -143,6 +143,7 @@ server.tool(
     auto_schedule: z.boolean().optional().describe("Use AI-powered auto-scheduling"),
     auto_schedule_start: z.string().optional().describe("Auto-schedule range start date"),
     auto_schedule_end: z.string().optional().describe("Auto-schedule range end date"),
+    labels: z.array(z.string()).optional().describe("Label names or IDs to apply at creation time. Use this for draft labels; existing draft labels are not editable via publer_update_post."),
   },
   async (params) => {
     try {
@@ -170,6 +171,7 @@ server.tool(
       const accountObjects = params.account_ids.map((accountId) => {
         const acc: Record<string, unknown> = { id: accountId };
         if (params.scheduled_at) acc.scheduled_at = params.scheduled_at;
+        if (params.labels?.length) acc.labels = params.labels;
         return acc;
       });
 
@@ -206,7 +208,7 @@ server.tool(
 // ── Tool: Publish Post Immediately ──
 server.tool(
   "publer_publish_post_now",
-  "Publish a post immediately across selected accounts. Returns a job_id.",
+  "Publish a post immediately across selected accounts. Pass labels here to apply labels at creation/publish time. Returns a job_id.",
   {
     account_ids: z.array(z.string()).describe("Array of account IDs to post to"),
     text: z.string().describe("Post caption/text content"),
@@ -217,6 +219,7 @@ server.tool(
       .describe("Content type"),
     media_ids: z.array(z.string()).optional().describe("Array of pre-uploaded media IDs"),
     url: z.string().optional().describe("URL for link posts"),
+    labels: z.array(z.string()).optional().describe("Label names or IDs to apply at publish time."),
   },
   async (params) => {
     try {
@@ -239,8 +242,13 @@ server.tool(
         }
       }
 
+      const accountObjects = params.account_ids.map((id) => {
+        const acc: Record<string, unknown> = { id };
+        if (params.labels?.length) acc.labels = params.labels;
+        return acc;
+      });
       const post: Record<string, unknown> = {
-        accounts: params.account_ids.map((id) => ({ id })),
+        accounts: accountObjects,
         networks,
       };
 
@@ -255,7 +263,7 @@ server.tool(
 // ── Tool: Update Post ──
 server.tool(
   "publer_update_post",
-  "Update an existing post's text, media, or scheduling.",
+  "Update an existing post's text, media, or scheduling. Do not use this for labels; Publer does not document labels as updatable here. For draft labels, set labels in publer_create_post when creating the draft.",
   {
     post_id: z.string().describe("ID of the post to update"),
     text: z.string().optional().describe("Updated text content"),
@@ -285,6 +293,117 @@ server.tool(
     try {
       const result = await client.deletePost(params.post_id);
       return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
+    } catch (e: unknown) {
+      return { content: [{ type: "text", text: `Error: ${(e as Error).message}` }], isError: true };
+    }
+  }
+);
+
+// ── Tool: Get Post ──
+server.tool(
+  "publer_get_post",
+  "Fetch a single post by ID, including its labels, state, and full content.",
+  { post_id: z.string().describe("ID of the post to fetch") },
+  async (params) => {
+    try {
+      const result = await client.getPost(params.post_id);
+      return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
+    } catch (e: unknown) {
+      return { content: [{ type: "text", text: `Error: ${(e as Error).message}` }], isError: true };
+    }
+  }
+);
+
+// ── Tool: Set Post Labels ──
+server.tool(
+  "publer_set_post_labels",
+  "Attempt to replace labels on an existing post only when Publer persists label updates. Do not use for existing drafts: live API tests show draft label updates return success but do not persist. For drafts, create a new labeled draft with publer_create_post; recreating/deleting an existing draft requires explicit user confirmation.",
+  {
+    post_id: z.string().describe("ID of the post to update"),
+    labels: z.array(z.string()).describe("Label names or IDs to apply. Publer may only persist this for post states/networks that support label updates."),
+  },
+  async (params) => {
+    try {
+      const result = await client.setPostLabels(params.post_id, params.labels);
+      return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
+    } catch (e: unknown) {
+      return { content: [{ type: "text", text: `Error: ${(e as Error).message}` }], isError: true };
+    }
+  }
+);
+
+// ── Tool: List Workspace Labels ──
+server.tool(
+  "publer_list_workspace_labels",
+  "Scan posts to discover all labels used in this workspace. Pages through posts and deduplicates labels by ID. Returns labels, scanned_posts, pages_read, and truncated flag.",
+  {
+    max_pages: z.number().optional().default(3).describe("Maximum pages of posts to scan (default 3)"),
+    state: z
+      .enum(["all", "scheduled", "published", "draft"])
+      .optional()
+      .default("all")
+      .describe("Post state to scan (default all)"),
+  },
+  async (params) => {
+    try {
+      const maxPages = params.max_pages ?? 3;
+      const state = params.state ?? "all";
+
+      const seenIds = new Set<string>();
+      const labels: Array<{ id: string; name: string; color?: string }> = [];
+      let scannedPosts = 0;
+      let pagesRead = 0;
+      let truncated = false;
+
+      for (let page = 0; page < maxPages; page++) {
+        const response = await client.listPosts({ state, page: String(page) });
+        pagesRead = page + 1;
+
+        let raw: unknown = response;
+        if (typeof response === "object" && response !== null && "posts" in response) {
+          raw = (response as { posts: unknown }).posts;
+        } else if (typeof response === "object" && response !== null && "data" in response) {
+          raw = (response as { data: unknown }).data;
+        }
+        const posts = Array.isArray(raw) ? raw : [];
+
+        if (posts.length === 0) break;
+        scannedPosts += posts.length;
+
+        for (const post of posts) {
+          if (typeof post !== "object" || post === null || !("labels" in post)) continue;
+          const ls = (post as { labels: unknown }).labels;
+          if (!Array.isArray(ls)) continue;
+          for (const l of ls) {
+            if (typeof l === "string" && !seenIds.has(l)) {
+              seenIds.add(l);
+              labels.push({ id: l, name: l });
+            } else if (typeof l === "object" && l !== null && "id" in l) {
+              const typed = l as { id: unknown; name?: unknown; color?: unknown };
+              if (typeof typed.id === "string" && !seenIds.has(typed.id)) {
+                seenIds.add(typed.id);
+                const label: { id: string; name: string; color?: string } = {
+                  id: typed.id,
+                  name: typeof typed.name === "string" ? typed.name : typed.id,
+                };
+                if (typeof typed.color === "string") label.color = typed.color;
+                labels.push(label);
+              }
+            }
+          }
+        }
+
+        if (page === maxPages - 1) truncated = true;
+      }
+
+      return {
+        content: [
+          {
+            type: "text",
+            text: JSON.stringify({ labels, scanned_posts: scannedPosts, pages_read: pagesRead, truncated }, null, 2),
+          },
+        ],
+      };
     } catch (e: unknown) {
       return { content: [{ type: "text", text: `Error: ${(e as Error).message}` }], isError: true };
     }
