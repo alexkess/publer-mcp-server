@@ -270,7 +270,7 @@ function createServer(env: Env): McpServer {
   // ── Delete Post ──
   server.tool(
     "publer_delete_post",
-    "Delete a post by its ID.",
+    "Delete a post by its ID using Publer's documented bulk delete endpoint with an explicit post_ids[] value.",
     { post_id: z.string().describe("ID of the post to delete") },
     async (params) => {
       try {

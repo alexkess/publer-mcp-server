@@ -77,7 +77,9 @@ export class PublerClient {
   }
 
   async deletePost(postId: string): Promise<unknown> {
-    return this.request("DELETE", `/posts/${postId}`);
+    const params = new URLSearchParams();
+    params.append("post_ids[]", postId);
+    return this.request("DELETE", `/posts?${params.toString()}`);
   }
 
   async getPost(postId: string): Promise<unknown> {
