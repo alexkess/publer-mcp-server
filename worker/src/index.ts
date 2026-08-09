@@ -76,6 +76,7 @@ function createServer(env: Env): McpServer {
       from: z.string().optional().describe("ISO date: include posts on/after this date"),
       to: z.string().optional().describe("ISO date: include posts on/before this date"),
       page: z.number().optional().describe("Page number (0-based)"),
+      account_ids: z.array(z.string()).optional().describe("Filter by account IDs"),
       query: z.string().optional().describe("Search keyword in post content"),
       postType: z
         .enum(["status", "link", "photo", "gif", "video", "reel", "story", "short", "poll", "document", "carousel", "article"])
@@ -84,13 +85,14 @@ function createServer(env: Env): McpServer {
     },
     async (params) => {
       try {
-        const queryParams: Record<string, string> = {};
+        const queryParams: Record<string, string | string[]> = {};
         if (params.state) queryParams.state = params.state;
         if (params.from) queryParams.from = params.from;
         if (params.to) queryParams.to = params.to;
         if (params.page !== undefined) queryParams.page = String(params.page);
         if (params.query) queryParams.query = params.query;
         if (params.postType) queryParams.postType = params.postType;
+        if (params.account_ids?.length) queryParams["account_ids[]"] = params.account_ids;
         const result = await client.listPosts(queryParams);
         return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
       } catch (e: unknown) {
@@ -113,8 +115,7 @@ function createServer(env: Env): McpServer {
       type: z
         .enum(["status", "photo", "video", "link", "carousel", "pdf"])
         .optional()
-        .default("status")
-        .describe("Content type"),
+        .describe("Content type. Defaults to photo when media is attached, status otherwise — a status post silently drops media."),
       media_ids: z.array(z.string()).optional().describe("Array of pre-uploaded media IDs"),
       url: z.string().optional().describe("URL for link posts"),
       title: z.string().optional().describe("Optional post title. Used by Pinterest (shown as pin heading) and YouTube (video title)."),
@@ -130,12 +131,15 @@ function createServer(env: Env): McpServer {
         const allAccounts = await client.listAccounts() as Array<{ id: string; provider: string }>;
         const providerById = new Map(allAccounts.map((a) => [a.id, a.provider]));
 
+        // A "status" post silently drops attached media, so default to photo when media is present.
+        const effectiveType = params.type ?? (params.media_ids?.length ? "photo" : "status");
+
         const networks: Record<string, unknown> = {};
         for (const accountId of params.account_ids) {
           const provider = providerById.get(accountId);
           if (provider && !networks[provider]) {
             const networkContent: Record<string, unknown> = {
-              type: params.type || "status",
+              type: effectiveType,
               text: params.text,
             };
             if (params.media_ids?.length) {
@@ -191,8 +195,7 @@ function createServer(env: Env): McpServer {
       type: z
         .enum(["status", "photo", "video", "link", "carousel", "pdf"])
         .optional()
-        .default("status")
-        .describe("Content type"),
+        .describe("Content type. Defaults to photo when media is attached, status otherwise — a status post silently drops media."),
       media_ids: z.array(z.string()).optional().describe("Array of pre-uploaded media IDs"),
       url: z.string().optional().describe("URL for link posts"),
       title: z.string().optional().describe("Optional post title. Used by Pinterest (shown as pin heading) and YouTube (video title)."),
@@ -205,12 +208,15 @@ function createServer(env: Env): McpServer {
         const allAccounts = await client.listAccounts() as Array<{ id: string; provider: string }>;
         const providerById = new Map(allAccounts.map((a) => [a.id, a.provider]));
 
+        // A "status" post silently drops attached media, so default to photo when media is present.
+        const effectiveType = params.type ?? (params.media_ids?.length ? "photo" : "status");
+
         const networks: Record<string, unknown> = {};
         for (const accountId of params.account_ids) {
           const provider = providerById.get(accountId);
           if (provider && !networks[provider]) {
             const networkContent: Record<string, unknown> = {
-              type: params.type || "status",
+              type: effectiveType,
               text: params.text,
             };
             if (params.media_ids?.length) {
@@ -432,9 +438,9 @@ function createServer(env: Env): McpServer {
     },
     async (params) => {
       try {
-        const queryParams: Record<string, string> = {
-          "types[]": params.types.join(","),
-          "used[]": "true,false",
+        const queryParams: Record<string, string | string[]> = {
+          "types[]": params.types,
+          "used[]": ["true", "false"],
           page: String(params.page || 0),
         };
         if (params.search) queryParams.search = params.search;
