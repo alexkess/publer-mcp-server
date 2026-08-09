@@ -95,8 +95,14 @@ export class PublerClient {
 
   async deletePost(postId: string): Promise<unknown> {
     const params = new URLSearchParams();
-    params.append("post_ids[]", postId);
-    return this.request("DELETE", `/posts?${params.toString()}`);
+    params.append("post_ids", postId);
+    const result = await this.request("DELETE", `/posts?${params.toString()}`);
+
+    if (!this.deletedIdsInclude(result, postId)) {
+      throw new Error(`Publer accepted the delete request but did not delete ${postId}: check permissions on that post.`);
+    }
+
+    return result;
   }
 
   async getPost(postId: string): Promise<unknown> {
@@ -104,7 +110,8 @@ export class PublerClient {
   }
 
   async setPostLabels(postId: string, labels: readonly string[]): Promise<unknown> {
-    const result = await this.updatePost(postId, { labels });
+    await this.updatePost(postId, { labels });
+    const result = await this.getPost(postId);
     const returnedLabels = this.extractLabels(result);
 
     if (!this.labelsMatch(returnedLabels, labels)) {
@@ -117,11 +124,7 @@ export class PublerClient {
   }
 
   private extractLabels(value: unknown): readonly PublerLabel[] {
-    if (typeof value !== "object" || value === null || !("labels" in value)) {
-      return [];
-    }
-
-    const labels = (value as { labels: unknown }).labels;
+    const labels = this.readLabels(value);
     if (!Array.isArray(labels)) {
       return [];
     }
@@ -139,6 +142,33 @@ export class PublerClient {
     }
 
     return parsed;
+  }
+
+  private readLabels(value: unknown): unknown {
+    if (typeof value !== "object" || value === null) {
+      return undefined;
+    }
+
+    const record = value as Record<string, unknown>;
+    if ("labels" in record) {
+      return record.labels;
+    }
+
+    const post = record.post;
+    if (typeof post !== "object" || post === null) {
+      return undefined;
+    }
+
+    return (post as Record<string, unknown>).labels;
+  }
+
+  private deletedIdsInclude(value: unknown, postId: string): boolean {
+    if (typeof value !== "object" || value === null || !("deleted_ids" in value)) {
+      return false;
+    }
+
+    const deletedIds = (value as { deleted_ids: unknown }).deleted_ids;
+    return Array.isArray(deletedIds) && deletedIds.includes(postId);
   }
 
   private labelsMatch(returnedLabels: readonly PublerLabel[], requestedLabels: readonly string[]): boolean {

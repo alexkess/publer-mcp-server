@@ -246,7 +246,7 @@ function createServer(env: Env): McpServer {
   // ── Update Post ──
   server.tool(
     "publer_update_post",
-    "Update an existing post's text, media, or scheduling. Do not use this for labels; Publer does not document labels as updatable here. For draft labels, set labels in publer_create_post when creating the draft.",
+    "Update an existing post's text, media, or scheduling. The client sends fields inside Publer's post wrapper; text/title are documented there, while scheduled_at/media should be verified with publer_get_post after update. Do not use this for labels; Publer does not document labels as updatable here. For draft labels, set labels in publer_create_post when creating the draft.",
     {
       post_id: z.string().describe("ID of the post to update"),
       text: z.string().optional().describe("Updated text content"),
@@ -270,7 +270,7 @@ function createServer(env: Env): McpServer {
   // ── Delete Post ──
   server.tool(
     "publer_delete_post",
-    "Delete a post by its ID using Publer's documented bulk delete endpoint with an explicit post_ids[] value.",
+    "Delete a post by its ID via Publer's bulk delete endpoint (DELETE /posts?post_ids=<id>). Verifies the id is returned in deleted_ids; errors otherwise.",
     { post_id: z.string().describe("ID of the post to delete") },
     async (params) => {
       try {
