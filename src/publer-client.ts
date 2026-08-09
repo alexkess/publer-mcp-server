@@ -70,9 +70,23 @@ export class PublerClient {
     return this.request("GET", "/accounts");
   }
 
+  // Publer ignores comma-joined array values — arrays must be sent as repeated
+  // params (types[]=photo&types[]=video), matching the chart_ids[] convention.
+  private buildQuery(params: Record<string, string | string[]>): string {
+    const qp = new URLSearchParams();
+    for (const [key, value] of Object.entries(params)) {
+      if (Array.isArray(value)) {
+        for (const v of value) qp.append(key, v);
+      } else {
+        qp.append(key, value);
+      }
+    }
+    return qp.toString();
+  }
+
   // ── Posts ──
-  async listPosts(params: Record<string, string>): Promise<unknown> {
-    const qs = new URLSearchParams(params).toString();
+  async listPosts(params: Record<string, string | string[]>): Promise<unknown> {
+    const qs = this.buildQuery(params);
     return this.request("GET", `/posts${qs ? `?${qs}` : ""}`);
   }
 
@@ -93,8 +107,8 @@ export class PublerClient {
   }
 
   // ── Media ──
-  async listMedia(params: Record<string, string>): Promise<unknown> {
-    const qs = new URLSearchParams(params).toString();
+  async listMedia(params: Record<string, string | string[]>): Promise<unknown> {
+    const qs = this.buildQuery(params);
     return this.request("GET", `/media${qs ? `?${qs}` : ""}`);
   }
 

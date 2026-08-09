@@ -100,14 +100,14 @@ server.tool(
   },
   async (params) => {
     try {
-      const queryParams: Record<string, string> = {};
+      const queryParams: Record<string, string | string[]> = {};
       if (params.state) queryParams.state = params.state;
       if (params.from) queryParams.from = params.from;
       if (params.to) queryParams.to = params.to;
       if (params.page !== undefined) queryParams.page = String(params.page);
       if (params.query) queryParams.query = params.query;
       if (params.postType) queryParams.postType = params.postType;
-      // account_ids need special handling for array params
+      if (params.account_ids?.length) queryParams["account_ids[]"] = params.account_ids;
       const result = await client.listPosts(queryParams);
       return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
     } catch (e: unknown) {
@@ -133,13 +133,15 @@ server.tool(
     type: z
       .enum(["status", "photo", "video", "link", "carousel", "pdf"])
       .optional()
-      .default("status")
-      .describe("Content type"),
+      .describe("Content type. Defaults to photo when media is attached, status otherwise — a status post silently drops media."),
     media_ids: z
       .array(z.string())
       .optional()
       .describe("Array of pre-uploaded media IDs"),
     url: z.string().optional().describe("URL for link posts"),
+    title: z.string().optional().describe("Optional post title. Used by Pinterest (shown as pin heading) and YouTube (video title)."),
+    album_id: z.string().optional().describe("Pinterest board ID (required for Pinterest posts). Get from account.albums[] in publer_list_accounts."),
+    location_id: z.string().optional().describe("Google Business Profile location ID (required for GBP posts)."),
     auto_schedule: z.boolean().optional().describe("Use AI-powered auto-scheduling"),
     auto_schedule_start: z.string().optional().describe("Auto-schedule range start date"),
     auto_schedule_end: z.string().optional().describe("Auto-schedule range end date"),
@@ -150,19 +152,23 @@ server.tool(
       const allAccounts = await client.listAccounts() as Array<{ id: string; provider: string }>;
       const providerById = new Map(allAccounts.map((a) => [a.id, a.provider]));
 
+      // A "status" post silently drops attached media, so default to photo when media is present.
+      const effectiveType = params.type ?? (params.media_ids?.length ? "photo" : "status");
+
       // Build networks object — keyed by provider, content shared across same-provider accounts
       const networks: Record<string, unknown> = {};
       for (const accountId of params.account_ids) {
         const provider = providerById.get(accountId);
         if (provider && !networks[provider]) {
           const networkContent: Record<string, unknown> = {
-            type: params.type || "status",
+            type: effectiveType,
             text: params.text,
           };
           if (params.media_ids?.length) {
             networkContent.media = params.media_ids.map((id) => ({ id }));
           }
           if (params.url) networkContent.url = params.url;
+          if (params.title) networkContent.title = params.title;
           networks[provider] = networkContent;
         }
       }
@@ -170,6 +176,8 @@ server.tool(
       const accountObjects = params.account_ids.map((accountId) => {
         const acc: Record<string, unknown> = { id: accountId };
         if (params.scheduled_at) acc.scheduled_at = params.scheduled_at;
+        if (params.album_id) acc.album_id = params.album_id;
+        if (params.location_id) acc.location_id = params.location_id;
         return acc;
       });
 
@@ -213,34 +221,47 @@ server.tool(
     type: z
       .enum(["status", "photo", "video", "link", "carousel", "pdf"])
       .optional()
-      .default("status")
-      .describe("Content type"),
+      .describe("Content type. Defaults to photo when media is attached, status otherwise — a status post silently drops media."),
     media_ids: z.array(z.string()).optional().describe("Array of pre-uploaded media IDs"),
     url: z.string().optional().describe("URL for link posts"),
+    title: z.string().optional().describe("Optional post title. Used by Pinterest (shown as pin heading) and YouTube (video title)."),
+    album_id: z.string().optional().describe("Pinterest board ID (required for Pinterest posts). Get from account.albums[] in publer_list_accounts."),
+    location_id: z.string().optional().describe("Google Business Profile location ID (required for GBP posts)."),
   },
   async (params) => {
     try {
       const allAccounts = await client.listAccounts() as Array<{ id: string; provider: string }>;
       const providerById = new Map(allAccounts.map((a) => [a.id, a.provider]));
 
+      // A "status" post silently drops attached media, so default to photo when media is present.
+      const effectiveType = params.type ?? (params.media_ids?.length ? "photo" : "status");
+
       const networks: Record<string, unknown> = {};
       for (const accountId of params.account_ids) {
         const provider = providerById.get(accountId);
         if (provider && !networks[provider]) {
           const networkContent: Record<string, unknown> = {
-            type: params.type || "status",
+            type: effectiveType,
             text: params.text,
           };
           if (params.media_ids?.length) {
             networkContent.media = params.media_ids.map((id) => ({ id }));
           }
           if (params.url) networkContent.url = params.url;
+          if (params.title) networkContent.title = params.title;
           networks[provider] = networkContent;
         }
       }
 
+      const accountObjects = params.account_ids.map((accountId) => {
+        const acc: Record<string, unknown> = { id: accountId };
+        if (params.album_id) acc.album_id = params.album_id;
+        if (params.location_id) acc.location_id = params.location_id;
+        return acc;
+      });
+
       const post: Record<string, unknown> = {
-        accounts: params.account_ids.map((id) => ({ id })),
+        accounts: accountObjects,
         networks,
       };
 
@@ -330,9 +351,9 @@ server.tool(
   },
   async (params) => {
     try {
-      const queryParams: Record<string, string> = {
-        "types[]": params.types.join(","),
-        "used[]": "true,false",
+      const queryParams: Record<string, string | string[]> = {
+        "types[]": params.types,
+        "used[]": ["true", "false"],
         page: String(params.page || 0),
       };
       if (params.search) queryParams.search = params.search;
