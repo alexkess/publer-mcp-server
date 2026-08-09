@@ -8,7 +8,7 @@ Created by [Kess Media](https://kess.media)
 
 ## Features
 
-- **17 tools** covering the full Publer API
+- **18 tools** covering the full Publer API
 - Create, schedule, publish, update, and delete posts
 - Upload media via URL (perfect for Dropbox/cloud storage integration)
 - Browse and search media library

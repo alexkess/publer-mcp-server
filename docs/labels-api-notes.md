@@ -63,3 +63,28 @@ unique labels by ID from the documented `posts` array. It preserves `name` and `
 when Publer returns label objects. It does not call a dedicated labels index endpoint (none is documented).
 If the workspace has more posts than the scan covers, `truncated: true` is returned and
 the caller should increase `max_pages` or filter by `state`.
+
+### updatePost wrapper caveat
+
+The client sends `PUT /posts/{id}` updates as:
+
+```json
+{ "post": { "text": "Updated text", "scheduled_at": "2026-08-10T10:00:00Z", "media": [{ "id": "media_123" }] } }
+```
+
+Publer documents `post.text` and `post.title` under that wrapper. The MCP also passes
+`scheduled_at`, `media`, and attempted `labels` through the same wrapper because this is
+the current update shape used by the client, but those fields need live verification on a
+disposable draft before claiming documented support.
+
+Manual smoke-test checklist:
+
+1. Create a disposable draft with `publer_create_post` and a creation-time label.
+2. Call `publer_get_post` for the returned post ID; live tests have verified `GET /posts/{id}` returns `200` and includes post details.
+3. Call `publer_set_post_labels` with a different label and confirm the tool reports the re-read result, not just the `PUT` response.
+4. Call `publer_update_post` with changed `text`, `scheduled_at`, and `media_ids`, then call `publer_get_post` again to verify which fields persisted.
+5. Call `publer_delete_post` and confirm the response includes the post ID in `deleted_ids`.
+
+If `scheduled_at` or `media` do not persist under the wrapper, split the update payload so
+documented fields stay inside `post` and any legacy-supported fields use the shape Publer
+actually persists.
