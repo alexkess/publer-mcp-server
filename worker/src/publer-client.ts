@@ -10,6 +10,11 @@ export interface PublerConfig {
   workspaceId: string;
 }
 
+type PublerLabel = {
+  id: string;
+  name: string;
+};
+
 export class PublerClient {
   private apiKey: string;
   private workspaceId: string;
@@ -82,11 +87,94 @@ export class PublerClient {
   }
 
   async updatePost(postId: string, body: unknown): Promise<unknown> {
-    return this.request("PUT", `/posts/${postId}`, body);
+    return this.request("PUT", `/posts/${postId}`, { post: body });
   }
 
   async deletePost(postId: string): Promise<unknown> {
-    return this.request("DELETE", `/posts/${postId}`);
+    const params = new URLSearchParams();
+    params.append("post_ids", postId);
+    const result = await this.request("DELETE", `/posts?${params.toString()}`);
+
+    if (!this.deletedIdsInclude(result, postId)) {
+      throw new Error(`Publer accepted the delete request but did not delete ${postId}: check permissions on that post.`);
+    }
+
+    return result;
+  }
+
+  async getPost(postId: string): Promise<unknown> {
+    return this.request("GET", `/posts/${postId}`);
+  }
+
+  async setPostLabels(postId: string, labels: readonly string[]): Promise<unknown> {
+    await this.updatePost(postId, { labels });
+    const result = await this.getPost(postId);
+    const returnedLabels = this.extractLabels(result);
+
+    if (!this.labelsMatch(returnedLabels, labels)) {
+      throw new Error(
+        "Publer accepted the update request but did not persist labels. Existing draft labels are not documented as updatable; set labels when creating the draft instead."
+      );
+    }
+
+    return result;
+  }
+
+  private extractLabels(value: unknown): readonly PublerLabel[] {
+    const labels = this.readLabels(value);
+    if (!Array.isArray(labels)) {
+      return [];
+    }
+
+    const parsed: PublerLabel[] = [];
+    for (const label of labels) {
+      if (typeof label === "string") {
+        parsed.push({ id: label, name: label });
+      } else if (typeof label === "object" && label !== null && "id" in label) {
+        const typed = label as { id: unknown; name?: unknown };
+        if (typeof typed.id === "string") {
+          parsed.push({ id: typed.id, name: typeof typed.name === "string" ? typed.name : typed.id });
+        }
+      }
+    }
+
+    return parsed;
+  }
+
+  private readLabels(value: unknown): unknown {
+    if (typeof value !== "object" || value === null) {
+      return undefined;
+    }
+
+    const record = value as Record<string, unknown>;
+    if ("labels" in record) {
+      return record.labels;
+    }
+
+    const post = record.post;
+    if (typeof post !== "object" || post === null) {
+      return undefined;
+    }
+
+    return (post as Record<string, unknown>).labels;
+  }
+
+  private deletedIdsInclude(value: unknown, postId: string): boolean {
+    if (typeof value !== "object" || value === null || !("deleted_ids" in value)) {
+      return false;
+    }
+
+    const deletedIds = (value as { deleted_ids: unknown }).deleted_ids;
+    return Array.isArray(deletedIds) && deletedIds.includes(postId);
+  }
+
+  private labelsMatch(returnedLabels: readonly PublerLabel[], requestedLabels: readonly string[]): boolean {
+    if (requestedLabels.length === 0) {
+      return returnedLabels.length === 0;
+    }
+
+    const returned = new Set(returnedLabels.flatMap((label) => [label.id, label.name]));
+    return requestedLabels.every((label) => returned.has(label));
   }
 
   async listMedia(params: Record<string, string | string[]>): Promise<unknown> {

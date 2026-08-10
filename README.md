@@ -8,7 +8,7 @@ Created by [Kess Media](https://kess.media)
 
 ## Features
 
-- **14 tools** covering the full Publer API
+- **18 tools** covering the full Publer API
 - Create, schedule, publish, update, and delete posts
 - Upload media via URL (perfect for Dropbox/cloud storage integration)
 - Browse and search media library
@@ -165,8 +165,11 @@ Log in to Publer, open your browser's developer tools (F12), go to the Network t
 | `publer_list_posts` | List and filter posts by state, date, type, account, or search |
 | `publer_create_post` | Create and schedule a post (text, photo, video, carousel, etc.) |
 | `publer_publish_post_now` | Publish a post immediately |
-| `publer_update_post` | Update an existing post |
+| `publer_update_post` | Update existing post text/media/scheduling, not labels |
 | `publer_delete_post` | Delete a post |
+| `publer_get_post` | Fetch a single post by ID, including its labels |
+| `publer_set_post_labels` | Attempt existing-post label updates; not for drafts |
+| `publer_list_workspace_labels` | Discover all labels used in the workspace (best-effort scan) |
 
 ### Media
 
@@ -215,6 +218,19 @@ The AI assistant will:
 1. Call `publer_list_accounts` to find the Instagram account ID
 2. Call `publer_get_post_insights` with the date range
 3. Present the results
+
+### Label posts for a campaign
+
+```
+"Create a draft post for next month's launch and label it 'launch-q3'."
+```
+
+The AI assistant will:
+1. Call `publer_list_accounts` to find the target account ID
+2. Call `publer_create_post` with `state: "draft"` and `labels: ["launch-q3"]`
+3. Call `publer_get_post` after the async job completes to inspect the saved labels
+
+Publer documents labels on create/schedule requests. Existing draft labels are not updatable via the documented API; live tests showed label update payloads return success but do not persist. To relabel an existing draft, ask the user before recreating it with labels and deleting the original, because that changes the post ID and may not preserve every internal Publer field.
 
 ## Development
 
